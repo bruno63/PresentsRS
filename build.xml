@@ -1,43 +1,87 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<project name="HelloWorldRS" default="build" basedir=".">
+<project name="PresentsRS" default="build" basedir=".">
 
-  <property environment="env"/>
-  <property name="java.build.platform" value="jre-1.7" />
-  <!--
-  <property name="openmdx.sdk" location="../opt/openmdx-2.14.0/${java.build.platform}/core/lib" />
-  <property name="opencrx.sdk" location="../opt/opencrx-3.0.0/${java.build.platform}/core/lib" />
-  -->
-  <property name="cxf.sdk" location="${env.CXF_HOME}/lib" />
-  <path id="project.class.path">
-    <fileset dir="${cxf.sdk}" includes="*.jar"/>
-  	<!--
-    <fileset dir="${openmdx.sdk}" includes="*.jar"/>
-    <fileset dir="${opencrx.sdk}" includes="*.jar"/>
-    -->
-  </path>
+	<property environment="env"/>
+	<property name="java.build.platform" value="jre-1.7" />
+	<!--
+	<property name="openmdx.sdk" location="../opt/openmdx-2.14.0/${java.build.platform}/core/lib" />
+	<property name="opencrx.sdk" location="../opt/opencrx-3.0.0/${java.build.platform}/core/lib" />
+	-->
+	<property name="cxf.lib" location="${env.CXF_HOME}/lib" />
+	<property name="tomcat.home" location="${env.TOMCAT_HOME}" />
+	<property name="junit.home" location="${env.JUNIT_HOME}" />
+	<property name="server.name" value="presents" />
+	<property name="test.class" value="org.opentdc.presents.test.PresentTest" />
+	<property name="test.jar.file" value="test.jar" />
+	<property name="src.dir" value="src/java" />
+	<property name="build.dir" value="build" />
 
-  <target name="javac" description="Compile java source">
-    <mkdir dir="build/${java.build.platform}/bin"/>
-    <javac srcdir="src/java" includes="**" encoding="utf-8"
-        destdir="build/${java.build.platform}/bin"
-        source="1.7" target="1.7" nowarn="true"
-        debug="true" debuglevel="lines,vars,source">
-      <classpath refid="project.class.path"/>
-    </javac>
-  </target>
+	<path id="project.class.path">
+		<fileset dir="${cxf.lib}" includes="*.jar" />
+		<!--
+		<fileset dir="${openmdx.sdk}" includes="*.jar"/>
+		<fileset dir="${opencrx.sdk}" includes="*.jar"/>
+		-->
+	</path>
+	
+	<path id="junit.class.path">
+		<!-- junit libs are implicitly loaded from $ANT_HOME/lib -->
+		<fileset dir="${cxf.lib}" includes="*.jar" />
+		<fileset dir="${junit.home}" includes="*.jar" />
+		<pathelement location="${test.jar.file}" />
+		<!--
+		<pathelement location="${tomcat.home}/lib/javaee-api-6.0-6-tomcat.jar" />
+		-->
+	</path>
 
-  <target name="build" depends="javac" description="Build this project" />
+	<target name="javac" description="Compile java source">
+		<mkdir dir="${build.dir}/${java.build.platform}"/>
+		<javac includeantruntime="false" srcdir="${src.dir}" includes="**" encoding="utf-8"
+			destdir="${build.dir}/${java.build.platform}"
+			source="1.7" target="1.7" nowarn="true"
+			debug="true" debuglevel="lines,vars,source">
+			<exclude name="**/test/**"/>
+			<classpath refid="project.class.path"/>
+		</javac>
+	</target>
 
-  <target name="war" depends="build" description="Create HelloWorldRS.war">
-    <zip destfile="HelloWorldRS.war">
-    	<zipfileset dir="src/war" />
-    	<zipfileset dir="build/${java.build.platform}/bin" prefix="WEB-INF/classes" /> 
-  	</zip>
-  </target>
+	<target name="build" depends="javac" description="Build this project" />
 
-  <target name="clean" description="Cleans this project">
-    <delete dir="build/${java.build.platform}/bin" failonerror="false" />
-    <delete dir="*.war" failonerror="false" />
-  </target>
+	<target name="serverWar" depends="build" description="Create ${server.name}.war">
+		<zip destfile="${server.name}.war">
+			<zipfileset dir="src/war" />
+			<zipfileset dir="${build.dir}/${java.build.platform}" prefix="WEB-INF/classes">
+				<exclude name="**/*Test*" />
+			</zipfileset>
+		</zip>
+	</target>
+	
+	<target name="deploy" depends="serverWar" description="Deploy this project into ${tomcat.home}/webapps">
+		<copy file="${server.name}.war" todir="${tomcat.home}/webapps" />
+		<echo>Start TomEE with 'starttomcat' or from within Eclipse</echo>
+	</target>
+	
+	<target name="clean" description="Cleans this project">
+		<delete file="${server.name}.war" failonerror="false" />
+		<delete dir="${tomcat.home}/webapps/${server.name}" failonerror="false" />
+		<delete file="${tomcat.home}/webapps/${server.name}.war" failonerror="false" />
+		<delete dir="${build.dir}/${java.build.platform}" failonerror="false" />
+		<delete file="${testjar.file}" failonerror="false" />
+	</target>
+	
+	<target name="buildtest" depends="build" description="Create ${test.jar.file}">
+		<jar destfile="${test.jar.file}" basedir="${build.dir}/${java.build.platform}">
+			<manifest>
+				<attribute name="Main-Class" value="${test.class}" />
+			</manifest>
+		</jar>
+	</target>
 
+	<target name="junit" depends="buildtest" description="Run jUnit tests">
+		<junit printsummary="on">
+			<classpath refid="junit.class.path" />
+			<formatter type="plain" usefile="false" />
+			<test name="${test.class}" outfile="testResult.txt" />
+		</junit>
+	</target>
 </project>
